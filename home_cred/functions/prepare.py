@@ -7,11 +7,9 @@ gc.enable()
 import time
 from contextlib import contextmanager
 
-na_values=['XNA','XPA','XAP']
-true_values = ['Y','F','Yes']
-false_values  = ['N','M','No']
-
-
+na_values=['XNA','XPA','XAP','nan']
+true_values = ['Y','F','Yes','True']
+false_values  = ['N','M','No','False']
 
 
 @contextmanager
@@ -29,7 +27,8 @@ def one_hot_encoder(df, categorical_columns=None, nan_as_category = True):
     new_columns = [c for c in df.columns if c not in original_columns]
     return df, new_columns
 
-def prepare_train_test(base_dir, encode_categories ='binary'):
+
+def raw_train_test(base_dir):
     application_train = pd.read_csv(base_dir/'application_train.csv', 
                                     converters={'date':pd.to_datetime}, 
                                     na_values=na_values, true_values=true_values, false_values=false_values)
@@ -41,8 +40,6 @@ def prepare_train_test(base_dir, encode_categories ='binary'):
     print(application_test.shape, len(set(application_test.columns)))
     print('Initial train ')
     print(application_train.shape, len(set(application_train.columns)))
-    
-    
     
     #for col in yes_no_cols:
     #    application_train[col] = application_train[col].astype(bool)
@@ -68,6 +65,11 @@ def prepare_train_test(base_dir, encode_categories ='binary'):
     for col in yes_no_cols:
         data[col] = data[col].map({True:1, False:0})
     
+    return data, y
+
+def prepare_train_test(base_dir, encode_categories ='binary'):
+
+    data, y = raw_train_test(base_dir)
     inc_by_org = data[['AMT_INCOME_TOTAL', 
                    'ORGANIZATION_TYPE']].groupby('ORGANIZATION_TYPE').median()['AMT_INCOME_TOTAL']
     
@@ -126,7 +128,7 @@ def prepare_train_test(base_dir, encode_categories ='binary'):
     return application_train.reset_index(drop=True) , application_test.reset_index(drop=True), y, categorical_feats
 
 
-def prepare_previous_application(base_dir, unique_curr):
+def raw_previous_application(base_dir, unique_curr):
     previous_application = pd.read_csv(base_dir/'previous_application.csv', na_values=na_values,
                                        true_values=true_values, false_values=false_values)
     print(previous_application.shape)
@@ -137,14 +139,19 @@ def prepare_previous_application(base_dir, unique_curr):
     print('Only in test/train set')
     previous_application = previous_application[previous_application.SK_ID_CURR.isin(unique_curr)]
     print('Only in test/train set, ',previous_application.shape)
-
+    
     # Days 365.243 values -> nan
     previous_application['DAYS_FIRST_DRAWING'].replace(365243, np.nan, inplace= True)
     previous_application['DAYS_FIRST_DUE'].replace(365243, np.nan, inplace= True)
     previous_application['DAYS_LAST_DUE_1ST_VERSION'].replace(365243, np.nan, inplace= True)
     previous_application['DAYS_LAST_DUE'].replace(365243, np.nan, inplace= True)
     previous_application['DAYS_TERMINATION'].replace(365243, np.nan, inplace= True)
+    return previous_application
 
+
+def prepare_previous_application(base_dir, unique_curr):
+
+    previous_application = raw_previous_application(base_dir, unique_curr)
 
 
     previous_application['APP_CREDIT_PERC'] = previous_application['AMT_APPLICATION'] / previous_application['AMT_CREDIT']
@@ -199,6 +206,8 @@ def prepare_previous_application(base_dir, unique_curr):
     print('Final, ')
     print(prev_agg.shape, len(set(prev_agg.columns)))
     return prev_agg
+
+
 
 def prepare_bureau(base_dir):
     bureau_balance = pd.read_csv(base_dir/'bureau_balance.csv', na_values=na_values,
@@ -300,11 +309,18 @@ def prepare_pos_cash(base_dir):
     return pos_agg
 
 
-# Preprocess installments_payments.csv
-def prepare_installments_payments(base_dir):
+
+def raw_installments_payments(base_dir,unique_curr):
     ins = pd.read_csv(base_dir/'installments_payments.csv', na_values=na_values,
                       true_values=true_values, false_values=false_values)
+    ins = ins[ins.SK_ID_CURR.isin(unique_curr)]
     
+    return ins
+
+# Preprocess installments_payments.csv
+def prepare_installments_payments(base_dir,unique_curr):
+
+    ins = raw_installments_payments(base_dir,unique_curr)
     # Percentage and difference paid in each installment (amount paid and installment value)
     ins['PAYMENT_PERC'] = ins['AMT_PAYMENT'] / ins['AMT_INSTALMENT']
     ins['PAYMENT_DIFF'] = ins['AMT_INSTALMENT'] - ins['AMT_PAYMENT']

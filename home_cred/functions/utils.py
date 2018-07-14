@@ -5,7 +5,7 @@ from sklearn.metrics import roc_auc_score, precision_recall_curve, roc_curve, av
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-_columns_description = pd.read_csv('/home/ubuntu//off/home-credit-default-risk/data/'+'HomeCredit_columns_description.csv', encoding='latin')
+_columns_description = pd.read_csv('./data/'+'HomeCredit_columns_description.csv', encoding='latin')
 
 def cols_desc(col):
     desc = _columns_description.set_index('Row').loc[col,['Description','Table']]

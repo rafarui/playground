@@ -317,6 +317,63 @@ def raw_installments_payments(base_dir,unique_curr):
     
     return ins
 
+
+# Preprocess installments_payments + previous_application
+def prepare_open_application(base_dir,unique_curr):
+    
+
+    previous_application = raw_previous_application(base_dir, unique_curr)
+    previous_application= previous_application[previous_application.DAYS_TERMINATION.isna()]
+    previous_application= previous_application[previous_application.NAME_CONTRACT_STATUS == 'Approved']
+    previous_application= previous_application[previous_application.NAME_CONTRACT_TYPE != 'Revolving loans']
+    print('Shape open aplication',previous_application.shape)
+    
+    unique_prev = previous_application.SK_ID_PREV.unique()
+    
+    ins = raw_installments_payments(base_dir,unique_curr)
+    ins = ins[ins.SK_ID_PREV.isin(unique_prev)]
+    
+    # Percentage and difference paid in each installment (amount paid and installment value)
+    ins['PAYMENT_PERC'] = ins['AMT_PAYMENT'] / ins['AMT_INSTALMENT']
+    ins['PAYMENT_DIFF'] = ins['AMT_INSTALMENT'] - ins['AMT_PAYMENT']
+    # Days past due and days before due (no negative values)
+    ins['DPD'] = ins['DAYS_ENTRY_PAYMENT'] - ins['DAYS_INSTALMENT']
+    ins['DBD'] = ins['DAYS_INSTALMENT'] - ins['DAYS_ENTRY_PAYMENT']
+    ins['DPD'] = ins['DPD'].apply(lambda x: x if x > 0 else 0)
+    ins['DBD'] = ins['DBD'].apply(lambda x: x if x > 0 else 0)
+    
+    # Features: Perform aggregations
+    aggregations = {
+        'DPD': ['max', 'mean', 'sum','min','std' ],
+        'DBD': ['max', 'mean', 'sum','min','std'],
+        'PAYMENT_PERC': ['max', 'mean', 'sum','min','std'],
+        'PAYMENT_DIFF': ['max', 'mean', 'sum','min','std'],
+        'AMT_INSTALMENT': ['sum'],
+        'AMT_PAYMENT': ['sum'],
+        'NUM_INSTALMENT_NUMBER':['max']
+    }
+
+    ins_agg = ins.groupby('SK_ID_PREV').agg(aggregations)
+    ins_agg.columns = pd.Index(['INSTAL_PREV_' + e[0] + "_" + e[1].upper() 
+                                for e in ins_agg.columns.tolist()])
+    
+    
+    
+    ins_agg= ins_agg.join(previous_application.set_index('SK_ID_PREV')[['SK_ID_CURR',
+                                                                        'AMT_CREDIT', 'CNT_PAYMENT']])
+    
+    ins_agg['DIFF_DUE_PREV'] = ins_agg['INSTAL_PREV_AMT_PAYMENT_SUM'] - ins_agg['AMT_CREDIT']
+    ins_agg['RATIO_DUE_PREV'] = ins_agg['INSTAL_PREV_AMT_PAYMENT_SUM']/ins_agg['AMT_CREDIT']
+    ins_agg['RATIO_NUM_INST'] = ins_agg['INSTAL_PREV_NUM_INSTALMENT_NUMBER_MAX']/ins_agg['CNT_PAYMENT']
+    ins_agg['DIFF_NUM_INST'] = ins_agg['CNT_PAYMENT'] - ins_agg['INSTAL_PREV_NUM_INSTALMENT_NUMBER_MAX']
+    print('Shape open aplication',previous_application.shape)
+    
+    ins_agg.reset_index(drop=True, inplace=True)
+    print(ins_agg.SK_ID_CURR.nunique(), ins_agg.shape)
+    ins_agg = ins_agg.groupby('SK_ID_CURR').mean()
+    print('Shape open aplication',ins_agg.shape)
+    return ins_agg
+
 # Preprocess installments_payments.csv
 def prepare_installments_payments(base_dir,unique_curr):
 

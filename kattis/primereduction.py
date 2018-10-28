@@ -1,4 +1,4 @@
-import sys,math
+import sys
 
 def sieve(n):
     """
@@ -29,7 +29,7 @@ def prime_red(n,primes):
             if (i > sqrt_n or n == 1):
                 break
             while not n % i: 
-                n = n/i
+                n = n//i
                 _sum += i
         if n != 1 and _sum != 0:
             _sum += n
@@ -37,12 +37,11 @@ def prime_red(n,primes):
             break
         n = _sum
 
-    print n,count_iter
+    print("%s %s" % (n,count_iter))
 
 
-primes = sieve(int(10 ** (9 *0.5)) + 1)
-for line in sys.stdin:
-    line = int(line)
-    if line==4:
-        break
-    prime_red(line,primes)
+primes = sieve(int(10**(9*0.5))+1)
+n = int(sys.stdin.readline().strip())
+while (n!=4):
+    prime_red(n,primes)
+    n = int(sys.stdin.readline().strip())
